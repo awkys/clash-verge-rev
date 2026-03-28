@@ -76,7 +76,7 @@ jobs:
       - name: Zip Installer
         run: |
           cd target/${{ matrix.target }}/release/bundle/nsis
-          7z a -p123456 ClashVerge-Windows_Installer.zip *setup.exe
+          zip -j -P 123456 ClashVerge-Windows_Installer.zip *setup.exe
         shell: bash
 
       - name: Upload Windows Artifacts

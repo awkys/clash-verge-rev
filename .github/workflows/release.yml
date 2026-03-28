@@ -246,7 +246,7 @@ jobs:
           cd target/${{ matrix.target }}/release/bundle/nsis
           for file in *setup.exe; do
             filename=$(basename "$file" .exe)
-            7z a -p123456 "${filename}.zip" "$file"
+            zip -j -P 123456 "${filename}.zip" "$file"
           done
         shell: bash
 
@@ -501,7 +501,7 @@ jobs:
           cd target/${{ matrix.target }}/release/bundle/nsis
           for file in *setup.exe; do
             filename=$(basename "$file" .exe)
-            7z a -p123456 "${filename}.zip" "$file"
+            zip -j -P 123456 "${filename}.zip" "$file"
           done
         shell: bash
 
