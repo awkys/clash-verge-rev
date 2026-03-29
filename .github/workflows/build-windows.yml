@@ -7,7 +7,6 @@ env:
   CARGO_INCREMENTAL: 0
   RUST_BACKTRACE: short
   HUSKY: 0
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   build-windows:
@@ -77,7 +76,7 @@ jobs:
       - name: Zip Installer
         run: |
           cd target/${{ matrix.target }}/release/bundle/nsis
-          zip -j -P 123456 ClashVerge-Windows_Installer.zip *setup.exe
+          7z a -p123456 ClashVerge-Windows_Installer.zip *setup.exe
         shell: bash
 
       - name: Upload Windows Artifacts

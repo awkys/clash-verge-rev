@@ -14,12 +14,3 @@ scripts/_env.sh
 .changelog_backups
 target
 CLAUDE.md
-
-# Build and Install Assets
-*.dmg
-*.app/
-*.command
-DMG_*
-Mac_Install_Package/
-Mac版_Clash_Verge_安装包.zip
-*.txt

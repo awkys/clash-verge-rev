@@ -13,7 +13,6 @@ env:
   CARGO_INCREMENTAL: 0
   RUST_BACKTRACE: short
   HUSKY: 0
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 concurrency:
   # only allow per workflow per commit (and not pr) to run at a time
   group: "${{ github.workflow }} - ${{ github.head_ref || github.ref }}"
@@ -247,7 +246,7 @@ jobs:
           cd target/${{ matrix.target }}/release/bundle/nsis
           for file in *setup.exe; do
             filename=$(basename "$file" .exe)
-            zip -j -P 123456 "${filename}.zip" "$file"
+            7z a -p123456 "${filename}.zip" "$file"
           done
         shell: bash
 
@@ -502,7 +501,7 @@ jobs:
           cd target/${{ matrix.target }}/release/bundle/nsis
           for file in *setup.exe; do
             filename=$(basename "$file" .exe)
-            zip -j -P 123456 "${filename}.zip" "$file"
+            7z a -p123456 "${filename}.zip" "$file"
           done
         shell: bash
 
