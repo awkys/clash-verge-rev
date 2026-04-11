@@ -24,7 +24,7 @@ import {
   TextSnippetOutlined,
 } from "@mui/icons-material";
 import { LoadingButton } from "@mui/lab";
-import { Box, Button, Divider, Grid, IconButton, Stack } from "@mui/material";
+import { Box, Button, Grid, IconButton, Stack } from "@mui/material";
 import { listen, TauriEvent } from "@tauri-apps/api/event";
 import { readText } from "@tauri-apps/plugin-clipboard-manager";
 import { readTextFile } from "@tauri-apps/plugin-fs";
@@ -38,7 +38,6 @@ import { closeAllConnections } from "tauri-plugin-mihomo-api";
 
 import { BasePage, BaseStyledTextField, DialogRef } from "@/components/base";
 import { ProfileItem } from "@/components/profile/profile-item";
-import { ProfileMore } from "@/components/profile/profile-more";
 import {
   ProfileViewer,
   ProfileViewerRef,
@@ -58,7 +57,7 @@ import {
   updateProfile,
 } from "@/services/cmds";
 import { showNotice } from "@/services/notice-service";
-import { useSetLoadingCache, useThemeMode } from "@/services/states";
+import { useSetLoadingCache } from "@/services/states";
 import { debugLog } from "@/utils/debug";
 
 // 记录profile切换状态
@@ -250,10 +249,7 @@ const ProfilePage = () => {
     }
   });
 
-  const { data: chainLogs = {}, mutate: mutateLogs } = useSWR(
-    "getRuntimeLogs",
-    getRuntimeLogs,
-  );
+  const { mutate: mutateLogs } = useSWR("getRuntimeLogs", getRuntimeLogs);
 
   const viewerRef = useRef<ProfileViewerRef>(null);
   const configRef = useRef<DialogRef>(null);
@@ -271,6 +267,23 @@ const ProfilePage = () => {
     return [...new Set([profiles.current ?? ""])].filter(Boolean);
   };
 
+  const findLatestImportedProfileUid = (
+    beforeImportUids: Set<string>,
+    refreshedProfiles?: IProfilesConfig,
+  ) => {
+    const items = refreshedProfiles?.items || [];
+
+    // 导入行为会把新订阅追加到末尾，这里从后往前找最新新增项
+    for (let i = items.length - 1; i >= 0; i--) {
+      const item = items[i];
+      const uid = item?.uid;
+      if (!uid) continue;
+      if (!beforeImportUids.has(uid)) return uid;
+    }
+
+    return null;
+  };
+
   const onImport = async () => {
     if (!url) return;
     // 校验url是否为http/https
@@ -280,10 +293,26 @@ const ProfilePage = () => {
     }
     setLoading(true);
 
+    const beforeImportUids = new Set(
+      (profiles.items || [])
+        .map((item) => item?.uid)
+        .filter((uid): uid is string => Boolean(uid)),
+    );
+
     const handleImportSuccess = async (noticeKey: string) => {
       showNotice.success(noticeKey);
       setUrl("");
-      await performRobustRefresh();
+      const refreshedProfiles = await performRobustRefresh();
+      const latestImportedUid = findLatestImportedProfileUid(
+        beforeImportUids,
+        refreshedProfiles,
+      );
+
+      if (latestImportedUid) {
+        await activateProfile(latestImportedUid, false);
+      } else {
+        debugLog("[订阅导入] 未识别到新增订阅，跳过自动选中");
+      }
     };
 
     try {
@@ -321,13 +350,14 @@ const ProfilePage = () => {
     let retryCount = 0;
     const maxRetries = 5;
     const baseDelay = 200;
+    let latestProfiles: IProfilesConfig | undefined;
 
     while (retryCount < maxRetries) {
       try {
         debugLog(`[导入刷新] 第${retryCount + 1}次尝试刷新配置数据`);
 
         // 强制刷新，绕过所有缓存
-        await mutateProfiles(undefined, {
+        latestProfiles = await mutateProfiles(undefined, {
           revalidate: true,
           rollbackOnError: false,
         });
@@ -338,7 +368,7 @@ const ProfilePage = () => {
         );
 
         await onEnhance(false);
-        return;
+        return latestProfiles;
       } catch (error) {
         console.error(`[导入刷新] 第${retryCount + 1}次刷新失败:`, error);
         retryCount++;
@@ -352,18 +382,22 @@ const ProfilePage = () => {
     console.warn(`[导入刷新] 常规刷新失败，尝试清除缓存重新获取`);
     try {
       // 清除SWR缓存并重新获取
-      await mutate("getProfiles", getProfiles(), { revalidate: true });
+      latestProfiles = await mutate("getProfiles", getProfiles(), {
+        revalidate: true,
+      });
       await onEnhance(false);
       showNotice.error(
         "profiles.page.feedback.notifications.importNeedsRefresh",
         3000,
       );
+      return latestProfiles;
     } catch (finalError) {
       console.error(`[导入刷新] 最终刷新尝试失败:`, finalError);
       showNotice.error(
         "profiles.page.feedback.notifications.importSuccess",
         5000,
       );
+      return latestProfiles;
     }
   };
 
@@ -728,12 +762,6 @@ const ProfilePage = () => {
     }
   });
 
-  const mode = useThemeMode();
-  const isLight = mode === "light";
-  const dividercolor = isLight
-    ? "rgba(0, 0, 0, 0.06)"
-    : "rgba(255, 255, 255, 0.06)";
-
   // 监听后端配置变更
   useEffect(() => {
     let unlistenPromise: Promise<() => void> | undefined;
@@ -1031,36 +1059,6 @@ const ProfilePage = () => {
                   </Grid>
                 ))}
               </SortableContext>
-            </Grid>
-          </Box>
-          <Divider
-            variant="middle"
-            flexItem
-            sx={{ width: `calc(100% - 32px)`, borderColor: dividercolor }}
-          ></Divider>
-          <Box sx={{ mt: 1.5, mb: "10px" }}>
-            <Grid container spacing={{ xs: 1, lg: 1 }}>
-              <Grid size={{ xs: 12, sm: 6, md: 6, lg: 6 }}>
-                <ProfileMore
-                  id="Merge"
-                  onSave={async (prev, curr) => {
-                    if (prev !== curr) {
-                      await onEnhance(false);
-                    }
-                  }}
-                />
-              </Grid>
-              <Grid size={{ xs: 12, sm: 6, md: 6, lg: 6 }}>
-                <ProfileMore
-                  id="Script"
-                  logInfo={chainLogs["Script"]}
-                  onSave={async (prev, curr) => {
-                    if (prev !== curr) {
-                      await onEnhance(false);
-                    }
-                  }}
-                />
-              </Grid>
             </Grid>
           </Box>
         </Box>
