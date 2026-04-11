@@ -64,6 +64,7 @@ impl Config {
     /// 初始化订阅
     pub async fn init_config() -> Result<()> {
         Self::ensure_default_profile_items().await?;
+        Self::ensure_system_proxy_default_once().await?;
 
         let verge = Self::verge().await.latest_arc();
         clash_verge_i18n::sync_locale(verge.language.as_deref());
@@ -112,6 +113,33 @@ impl Config {
             let script_item = &mut PrfItem::from_script(Some("Script".into()))?;
             profiles_append_item_safe(script_item).await?;
         }
+        Ok(())
+    }
+
+    // One-time migration: default to system proxy enabled for existing old configs.
+    async fn ensure_system_proxy_default_once() -> Result<()> {
+        let verge = Self::verge().await;
+        let should_initialize = {
+            let latest = verge.latest_arc();
+            !latest.system_proxy_initialized.unwrap_or(false)
+        };
+
+        if !should_initialize {
+            return Ok(());
+        }
+
+        verge.edit_draft(|d| {
+            d.enable_system_proxy = Some(true);
+            d.system_proxy_initialized = Some(true);
+        });
+        verge.apply();
+
+        logging!(
+            info,
+            Type::Config,
+            "首次启动迁移：默认开启系统代理并写入初始化标记"
+        );
+        logging_error!(Type::Config, verge.data_arc().save_file().await);
         Ok(())
     }
 

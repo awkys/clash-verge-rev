@@ -64,7 +64,7 @@ pub async fn enhance_profiles() -> CmdResult {
 
 /// 导入配置文件
 #[tauri::command]
-pub async fn import_profile(url: std::string::String, option: Option<PrfOption>) -> CmdResult {
+pub async fn import_profile(url: std::string::String, option: Option<PrfOption>) -> CmdResult<String> {
     logging!(info, Type::Cmd, "[导入订阅] 开始导入: {}", help::mask_url(&url));
 
     // 直接依赖 PrfItem::from_url 自身的超时/重试逻辑，不再使用 tokio::time::timeout 包裹
@@ -78,6 +78,11 @@ pub async fn import_profile(url: std::string::String, option: Option<PrfOption>)
             return Err(format!("导入订阅失败: {}", e).into());
         }
     };
+
+    let imported_uid = item
+        .uid
+        .clone()
+        .ok_or_else(|| String::from("导入订阅失败: 未生成订阅 UID"))?;
 
     match profiles_append_item_safe(item).await {
         Ok(_) => match profiles_save_file_safe().await {
@@ -94,22 +99,28 @@ pub async fn import_profile(url: std::string::String, option: Option<PrfOption>)
         }
     }
 
-    if let Some(uid) = &item.uid {
-        logging!(info, Type::Cmd, "[导入订阅] 发送配置变更通知: {}", uid);
-        handle::Handle::notify_profile_changed(uid);
-    }
+    logging!(
+        info,
+        Type::Cmd,
+        "[导入订阅] 发送配置变更通知: {}",
+        imported_uid
+    );
+    handle::Handle::notify_profile_changed(&imported_uid);
 
     // 异步保存配置文件并发送全局通知
-    if let Some(uid) = &item.uid {
-        // 延迟发送，确保文件已完全写入
-        tokio::time::sleep(Duration::from_millis(100)).await;
-        logging!(info, Type::Cmd, "[导入订阅] 发送配置变更通知: {}", uid);
-        handle::Handle::notify_profile_changed(uid);
-    }
+    // 延迟发送，确保文件已完全写入
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    logging!(
+        info,
+        Type::Cmd,
+        "[导入订阅] 发送配置变更通知: {}",
+        imported_uid
+    );
+    handle::Handle::notify_profile_changed(&imported_uid);
 
     logging!(info, Type::Cmd, "[导入订阅] 导入完成: {}", help::mask_url(&url));
     AutoBackupManager::trigger_backup(AutoBackupTrigger::ProfileChange);
-    Ok(())
+    Ok(imported_uid)
 }
 
 /// 调整profile的顺序

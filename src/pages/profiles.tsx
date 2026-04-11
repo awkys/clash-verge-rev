@@ -267,23 +267,6 @@ const ProfilePage = () => {
     return [...new Set([profiles.current ?? ""])].filter(Boolean);
   };
 
-  const findLatestImportedProfileUid = (
-    beforeImportUids: Set<string>,
-    refreshedProfiles?: IProfilesConfig,
-  ) => {
-    const items = refreshedProfiles?.items || [];
-
-    // 导入行为会把新订阅追加到末尾，这里从后往前找最新新增项
-    for (let i = items.length - 1; i >= 0; i--) {
-      const item = items[i];
-      const uid = item?.uid;
-      if (!uid) continue;
-      if (!beforeImportUids.has(uid)) return uid;
-    }
-
-    return null;
-  };
-
   const onImport = async () => {
     if (!url) return;
     // 校验url是否为http/https
@@ -293,44 +276,42 @@ const ProfilePage = () => {
     }
     setLoading(true);
 
-    const beforeImportUids = new Set(
-      (profiles.items || [])
-        .map((item) => item?.uid)
-        .filter((uid): uid is string => Boolean(uid)),
-    );
-
-    const handleImportSuccess = async (noticeKey: string) => {
+    const handleImportSuccess = async (
+      noticeKey: string,
+      importedUid?: string,
+    ) => {
       showNotice.success(noticeKey);
       setUrl("");
-      const refreshedProfiles = await performRobustRefresh();
-      const latestImportedUid = findLatestImportedProfileUid(
-        beforeImportUids,
-        refreshedProfiles,
-      );
 
-      if (latestImportedUid) {
-        await activateProfile(latestImportedUid, false);
+      if (importedUid) {
+        await activateProfile(importedUid, false);
       } else {
-        debugLog("[订阅导入] 未识别到新增订阅，跳过自动选中");
+        debugLog("[订阅导入] 导入返回的 UID 为空，跳过自动选中");
       }
+
+      await performRobustRefresh();
     };
 
     try {
       // 尝试正常导入
-      await importProfile(url);
-      await handleImportSuccess("shared.feedback.notifications.importSuccess");
+      const importedUid = await importProfile(url);
+      await handleImportSuccess(
+        "shared.feedback.notifications.importSuccess",
+        importedUid,
+      );
     } catch (initialErr) {
       console.warn("[订阅导入] 首次导入失败:", initialErr);
 
       showNotice.info("profiles.page.feedback.notifications.importRetry");
       try {
         // 使用自身代理尝试导入
-        await importProfile(url, {
+        const importedUid = await importProfile(url, {
           with_proxy: false,
           self_proxy: true,
         });
         await handleImportSuccess(
           "shared.feedback.notifications.importWithClashProxy",
+          importedUid,
         );
       } catch (retryErr) {
         // 回退导入也失败
