@@ -37,6 +37,7 @@ interface Props {
   mode: string;
   isChainMode?: boolean;
   chainConfigData?: string | null;
+  delayTestRequestId?: number;
 }
 
 interface ProxyChainItem {
@@ -50,7 +51,12 @@ const VirtuosoFooter = () => <div style={{ height: "8px" }} />;
 
 export const ProxyGroups = (props: Props) => {
   const { t } = useTranslation();
-  const { mode, isChainMode = false, chainConfigData } = props;
+  const {
+    mode,
+    isChainMode = false,
+    chainConfigData,
+    delayTestRequestId = 0,
+  } = props;
   const [proxyChain, setProxyChain] = useState<ProxyChainItem[]>(() => {
     try {
       const saved = localStorage.getItem("proxy-chain-items");
@@ -396,6 +402,28 @@ export const ProxyGroups = (props: Props) => {
       .map((item) => item.group!.name);
     return Array.from(new Set(names));
   }, [renderList]);
+
+  const delayTestGroupNames = useMemo(() => {
+    const names = renderList
+      .map((item) => item.group?.name)
+      .filter((name): name is string => Boolean(name));
+    return Array.from(new Set(names));
+  }, [renderList]);
+
+  const runDelayCheckForGroups = useLockFn(async () => {
+    for (const groupName of delayTestGroupNames) {
+      await handleCheckAll(groupName);
+    }
+  });
+
+  const lastDelayTestRequestIdRef = useRef(0);
+  useEffect(() => {
+    if (delayTestRequestId <= 0) return;
+    if (delayTestRequestId === lastDelayTestRequestIdRef.current) return;
+
+    lastDelayTestRequestIdRef.current = delayTestRequestId;
+    runDelayCheckForGroups();
+  }, [delayTestRequestId, runDelayCheckForGroups]);
 
   if (mode === "direct") {
     return <BaseEmpty textKey="proxies.page.messages.directMode" />;

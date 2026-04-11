@@ -15,6 +15,7 @@ use tokio::fs;
 // TODO, use other re-export
 use reqwest_dav::re_exports::url::form_urlencoded;
 use tauri::Url;
+const DEFAULT_REMOTE_UPDATE_INTERVAL_MINUTES: u64 = 60;
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
 pub struct PrfItem {
@@ -262,7 +263,7 @@ impl PrfItem {
         let with_proxy = option.is_some_and(|o| o.with_proxy.unwrap_or(false));
         let self_proxy = option.is_some_and(|o| o.self_proxy.unwrap_or(false));
         let accept_invalid_certs = option.is_some_and(|o| o.danger_accept_invalid_certs.unwrap_or(false));
-        let allow_auto_update = option.map(|o| o.allow_auto_update.unwrap_or(true));
+        let allow_auto_update = Some(option.and_then(|o| o.allow_auto_update).unwrap_or(true));
         let user_agent = option.and_then(|o| o.user_agent.clone());
         let update_interval = option.and_then(|o| o.update_interval);
         let timeout = option.and_then(|o| o.timeout_seconds).unwrap_or(20);
@@ -357,13 +358,11 @@ impl PrfItem {
         };
         let update_interval = match update_interval {
             Some(val) => Some(val),
-            None => match header.get("profile-update-interval") {
-                Some(value) => match value.to_str().unwrap_or("").parse::<u64>() {
-                    Ok(val) => Some(val * 60), // hour -> min
-                    Err(_) => None,
-                },
-                None => None,
-            },
+            None => header
+                .get("profile-update-interval")
+                .and_then(|value| value.to_str().ok())
+                .and_then(|value| value.parse::<u64>().ok().map(|hours| hours * 60))
+                .or(Some(DEFAULT_REMOTE_UPDATE_INTERVAL_MINUTES)),
         };
 
         let home = match header.get("profile-web-page-url") {

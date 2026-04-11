@@ -1,4 +1,8 @@
-import { LanOutlined, LanRounded } from "@mui/icons-material";
+import {
+  LanOutlined,
+  LanRounded,
+  NetworkCheckRounded,
+} from "@mui/icons-material";
 import { Box, Button, ButtonGroup } from "@mui/material";
 import { useLockFn } from "ahooks";
 import { useCallback, useEffect, useMemo, useReducer, useState } from "react";
@@ -40,6 +44,7 @@ const ProxyPage = () => {
     (_: string | null, action: string | null) => action,
     null as string | null,
   );
+  const [delayTestRequestId, setDelayTestRequestId] = useState(0);
 
   const { clashConfig, refreshClashConfig } = useAppData();
 
@@ -80,6 +85,10 @@ const ProxyPage = () => {
       }
     }
   });
+
+  const onDelayCheckAll = useCallback(() => {
+    setDelayTestRequestId((prev) => prev + 1);
+  }, []);
 
   // 当开启链式代理模式时，获取配置数据
   useEffect(() => {
@@ -155,6 +164,16 @@ const ProxyPage = () => {
 
           <Button
             size="small"
+            variant="outlined"
+            onClick={onDelayCheckAll}
+            sx={{ ml: 1 }}
+            startIcon={<NetworkCheckRounded fontSize="small" />}
+          >
+            {t("proxies.page.tooltips.delayCheck")}
+          </Button>
+
+          <Button
+            size="small"
             variant={isChainMode ? "contained" : "outlined"}
             onClick={onToggleChainMode}
             sx={{ ml: 1 }}
@@ -175,6 +194,7 @@ const ProxyPage = () => {
         mode={curMode ?? "rule"}
         isChainMode={isChainMode}
         chainConfigData={chainConfigData}
+        delayTestRequestId={delayTestRequestId}
       />
     </BasePage>
   );

@@ -34,7 +34,10 @@ sudo xattr -r -d com.apple.quarantine "/Applications/Clash Verge.app"
 if [ $? -eq 0 ]; then
     echo ""
     echo "🎉 恭喜！安装及安全修复已成功！"
-    echo "现在您可以前往启动台(Launchpad) 或 【应用程序】 里正常双击打开并使用 Clash Verge 啦！"
+    echo "⏳ 正在自动启动 Clash Verge..."
+    open -a "/Applications/Clash Verge.app"
+    echo "✅ 已尝试自动启动 Clash Verge。"
+    echo "现在您也可以前往启动台(Launchpad) 或 【应用程序】 里正常双击打开并使用 Clash Verge。"
     echo "以后再也不会提示损坏或拦截了！"
 else
     echo ""

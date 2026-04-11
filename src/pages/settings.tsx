@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 
 import { BasePage } from "@/components/base";
 import SettingClash from "@/components/setting/setting-clash";
+import SettingDevice from "@/components/setting/setting-device";
 import SettingSystem from "@/components/setting/setting-system";
 import SettingVergeAdvanced from "@/components/setting/setting-verge-advanced";
 import SettingVergeBasic from "@/components/setting/setting-verge-basic";
@@ -50,6 +51,15 @@ const SettingPage = () => {
             }}
           >
             <SettingVergeBasic onError={onError} />
+          </Box>
+          <Box
+            sx={{
+              borderRadius: 2,
+              marginBottom: 1.5,
+              backgroundColor: isDark ? "#282a36" : "#ffffff",
+            }}
+          >
+            <SettingDevice />
           </Box>
           <Box
             sx={{

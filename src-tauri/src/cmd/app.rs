@@ -5,13 +5,17 @@ use crate::{
     cmd::StringifyErr as _,
     feat,
     utils::dirs::{self, PathBufExec as _},
+    utils::resolve,
 };
 use clash_verge_logging::{Type, logging};
 use smartstring::alias::String;
 use std::path::Path;
+use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::{AppHandle, Manager as _};
 use tokio::fs;
 use tokio::io::AsyncWriteExt as _;
+
+static UI_READY_STARTUP_UPDATE_TRIGGERED: AtomicBool = AtomicBool::new(false);
 
 /// 打开应用程序所在目录
 #[tauri::command]
@@ -240,6 +244,13 @@ pub async fn copy_icon_file(path: String, icon_info: IconInfo) -> CmdResult<Stri
 pub fn notify_ui_ready() {
     logging!(info, Type::Cmd, "前端UI已准备就绪");
     ui::mark_ui_ready();
+
+    if UI_READY_STARTUP_UPDATE_TRIGGERED
+        .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+        .is_ok()
+    {
+        resolve::trigger_startup_subscription_update();
+    }
 }
 
 /// UI加载阶段

@@ -1,7 +1,6 @@
 import {
   DnsOutlined,
   HistoryEduOutlined,
-  RouterOutlined,
   SettingsOutlined,
   SpeedOutlined,
 } from "@mui/icons-material";
@@ -17,14 +16,12 @@ import {
   FormGroup,
   Grid,
   IconButton,
-  Skeleton,
   Tooltip,
 } from "@mui/material";
-import { Suspense, lazy, useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { BasePage } from "@/components/base";
-import { ClashModeCard } from "@/components/home/clash-mode-card";
 import { CurrentProxyCard } from "@/components/home/current-proxy-card";
 import { EnhancedCard } from "@/components/home/enhanced-card";
 import { EnhancedTrafficStats } from "@/components/home/enhanced-traffic-stats";
@@ -34,39 +31,12 @@ import { useProfiles } from "@/hooks/use-profiles";
 import { useVerge } from "@/hooks/use-verge";
 import { entry_lightweight_mode } from "@/services/cmds";
 
-const LazyTestCard = lazy(() =>
-  import("@/components/home/test-card").then((module) => ({
-    default: module.TestCard,
-  })),
-);
-const LazyIpInfoCard = lazy(() =>
-  import("@/components/home/ip-info-card").then((module) => ({
-    default: module.IpInfoCard,
-  })),
-);
-const LazyClashInfoCard = lazy(() =>
-  import("@/components/home/clash-info-card").then((module) => ({
-    default: module.ClashInfoCard,
-  })),
-);
-const LazySystemInfoCard = lazy(() =>
-  import("@/components/home/system-info-card").then((module) => ({
-    default: module.SystemInfoCard,
-  })),
-);
-
 // 定义首页卡片设置接口
 interface HomeCardsSettings {
   profile: boolean;
   proxy: boolean;
   network: boolean;
-  mode: boolean;
   traffic: boolean;
-  info: boolean;
-  clashinfo: boolean;
-  systeminfo: boolean;
-  test: boolean;
-  ip: boolean;
   [key: string]: boolean;
 }
 
@@ -143,56 +113,11 @@ const HomeSettingsDialog = ({
           <FormControlLabel
             control={
               <Checkbox
-                checked={cards.mode || false}
-                onChange={() => handleToggle("mode")}
-              />
-            }
-            label={t("home.page.settings.cards.proxyMode")}
-          />
-          <FormControlLabel
-            control={
-              <Checkbox
                 checked={cards.traffic || false}
                 onChange={() => handleToggle("traffic")}
               />
             }
             label={t("home.page.settings.cards.traffic")}
-          />
-          <FormControlLabel
-            control={
-              <Checkbox
-                checked={cards.test || false}
-                onChange={() => handleToggle("test")}
-              />
-            }
-            label={t("home.page.settings.cards.tests")}
-          />
-          <FormControlLabel
-            control={
-              <Checkbox
-                checked={cards.ip || false}
-                onChange={() => handleToggle("ip")}
-              />
-            }
-            label={t("home.page.settings.cards.ip")}
-          />
-          <FormControlLabel
-            control={
-              <Checkbox
-                checked={cards.clashinfo || false}
-                onChange={() => handleToggle("clashinfo")}
-              />
-            }
-            label={t("home.page.settings.cards.clashInfo")}
-          />
-          <FormControlLabel
-            control={
-              <Checkbox
-                checked={cards.systeminfo || false}
-                onChange={() => handleToggle("systeminfo")}
-              />
-            }
-            label={t("home.page.settings.cards.systemInfo")}
           />
         </FormGroup>
       </DialogContent>
@@ -221,16 +146,10 @@ const HomePage = () => {
   // 卡片显示状态
   const defaultCards = useMemo<HomeCardsSettings>(
     () => ({
-      info: false,
       profile: true,
       proxy: true,
       network: true,
-      mode: true,
       traffic: true,
-      clashinfo: true,
-      systeminfo: true,
-      test: true,
-      ip: true,
     }),
     [],
   );
@@ -277,18 +196,36 @@ const HomePage = () => {
     [effectiveHomeCards],
   );
 
-  const criticalCards = useMemo(
-    () => [
-      renderCard(
-        "profile",
-        <HomeProfileCard current={current} onProfileUpdated={mutateProfiles} />,
-      ),
-      renderCard("proxy", <CurrentProxyCard />),
-      renderCard("network", <NetworkSettingsCard />),
-      renderCard("mode", <ClashModeEnhancedCard />),
-    ],
-    [current, mutateProfiles, renderCard],
-  );
+  const criticalCards = useMemo(() => {
+    const cards = [
+      {
+        key: "profile",
+        component: (
+          <HomeProfileCard
+            current={current}
+            onProfileUpdated={mutateProfiles}
+          />
+        ),
+      },
+      { key: "proxy", component: <CurrentProxyCard /> },
+      { key: "network", component: <NetworkSettingsCard /> },
+    ].filter((item) => effectiveHomeCards[item.key]);
+
+    return cards.map((item, index) => {
+      const size =
+        cards.length === 1
+          ? 12
+          : cards.length === 3 && index === cards.length - 1
+            ? 12
+            : 6;
+
+      return (
+        <Grid size={size} key={item.key}>
+          {item.component}
+        </Grid>
+      );
+    });
+  }, [current, mutateProfiles, effectiveHomeCards]);
 
   // 新增：保存设置时用requestIdleCallback/setTimeout
   const handleSaveSettings = (newCards: HomeCardsSettings) => {
@@ -323,30 +260,6 @@ const HomePage = () => {
           <EnhancedTrafficStats />
         </EnhancedCard>,
         12,
-      ),
-      renderCard(
-        "test",
-        <Suspense fallback={<Skeleton variant="rectangular" height={200} />}>
-          <LazyTestCard />
-        </Suspense>,
-      ),
-      renderCard(
-        "ip",
-        <Suspense fallback={<Skeleton variant="rectangular" height={200} />}>
-          <LazyIpInfoCard />
-        </Suspense>,
-      ),
-      renderCard(
-        "clashinfo",
-        <Suspense fallback={<Skeleton variant="rectangular" height={200} />}>
-          <LazyClashInfoCard />
-        </Suspense>,
-      ),
-      renderCard(
-        "systeminfo",
-        <Suspense fallback={<Skeleton variant="rectangular" height={200} />}>
-          <LazySystemInfoCard />
-        </Suspense>,
       ),
     ],
     [t, renderCard],
@@ -408,21 +321,6 @@ const NetworkSettingsCard = () => {
       action={null}
     >
       <ProxyTunCard />
-    </EnhancedCard>
-  );
-};
-
-// 增强版 Clash 模式卡片组件
-const ClashModeEnhancedCard = () => {
-  const { t } = useTranslation();
-  return (
-    <EnhancedCard
-      title={t("home.page.cards.proxyMode")}
-      icon={<RouterOutlined />}
-      iconColor="info"
-      action={null}
-    >
-      <ClashModeCard />
     </EnhancedCard>
   );
 };

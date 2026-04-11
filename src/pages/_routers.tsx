@@ -27,7 +27,7 @@ import RulesPage from "./rules";
 import SettingsPage from "./settings";
 import UnlockPage from "./unlock";
 
-export const navItems = [
+const rootNavItems = [
   {
     label: "layout.components.navigation.tabs.home",
     path: "/",
@@ -46,6 +46,9 @@ export const navItems = [
     icon: [<DnsRoundedIcon key="mui" />, <ProfilesSvg key="svg" />],
     Component: ProfilesPage,
   },
+];
+
+export const deviceNavItems = [
   {
     label: "layout.components.navigation.tabs.connections",
     path: "/connections",
@@ -70,6 +73,10 @@ export const navItems = [
     icon: [<LockOpenRoundedIcon key="mui" />, <UnlockSvg key="svg" />],
     Component: UnlockPage,
   },
+];
+
+export const navItems = [
+  ...rootNavItems,
   {
     label: "layout.components.navigation.tabs.settings",
     path: "/settings",
@@ -78,11 +85,17 @@ export const navItems = [
   },
 ];
 
+const routeItems = [
+  ...rootNavItems,
+  ...deviceNavItems,
+  navItems[navItems.length - 1],
+];
+
 export const router = createBrowserRouter([
   {
     path: "/",
     Component: Layout,
-    children: navItems.map(
+    children: routeItems.map(
       (item) =>
         ({
           path: item.path,

@@ -1,4 +1,7 @@
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::{
+    sync::atomic::{AtomicBool, Ordering},
+    time::Duration,
+};
 
 use anyhow::Result;
 
@@ -6,6 +9,7 @@ use crate::{
     config::Config,
     core::{
         CoreManager, Timer,
+        handle::Handle,
         hotkey::Hotkey,
         logger::Logger,
         service::{SERVICE_MANAGER, ServiceManager, is_service_ipc_path_exists},
@@ -27,6 +31,7 @@ pub mod window;
 pub mod window_script;
 
 static RESOLVE_DONE: AtomicBool = AtomicBool::new(false);
+static STARTUP_SUBSCRIPTION_UPDATE_TRIGGERED: AtomicBool = AtomicBool::new(false);
 
 pub fn init_work_dir_and_logger() -> anyhow::Result<()> {
     AsyncHandler::block_on(async {
@@ -114,6 +119,92 @@ pub(super) async fn init_startup_script() {
 
 pub(super) async fn init_timer() {
     logging_error!(Type::Setup, Timer::global().init().await);
+}
+
+pub fn trigger_startup_subscription_update() {
+    if STARTUP_SUBSCRIPTION_UPDATE_TRIGGERED
+        .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+        .is_err()
+    {
+        return;
+    }
+
+    AsyncHandler::spawn(|| async move {
+        tokio::time::sleep(Duration::from_millis(1500)).await;
+
+        let success = update_all_subscriptions_on_startup().await;
+        if !success {
+            logging!(warn, Type::Setup, "启动自动更新订阅首次尝试未成功，15秒后重试一次");
+            tokio::time::sleep(Duration::from_secs(15)).await;
+            let _ = update_all_subscriptions_on_startup().await;
+        }
+    });
+}
+
+pub async fn update_all_subscriptions_on_startup() -> bool {
+    let remote_uids = {
+        let profiles = Config::profiles().await;
+        let profiles_ref = profiles.latest_arc();
+
+        profiles_ref
+            .get_items()
+            .map(|items| {
+                items
+                    .iter()
+                    .filter_map(|item| {
+                        if item.itype.as_deref() == Some("remote") {
+                            item.uid.clone()
+                        } else {
+                            None
+                        }
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default()
+    };
+
+    if remote_uids.is_empty() {
+        logging!(info, Type::Setup, "启动自动更新订阅：未找到远程订阅，跳过");
+        return false;
+    }
+
+    logging!(
+        info,
+        Type::Setup,
+        "启动自动更新订阅：准备更新 {} 个远程订阅",
+        remote_uids.len()
+    );
+
+    let mut failed = 0usize;
+
+    for uid in &remote_uids {
+        if let Err(error) = feat::update_profile(uid, None, false, true, false).await {
+            failed += 1;
+            logging!(warn, Type::Setup, "启动自动更新订阅失败，uid={}: {}", uid, error);
+        }
+    }
+
+    Config::profiles().await.apply();
+
+    match CoreManager::global().update_config().await {
+        Ok(_) => {
+            Handle::refresh_clash();
+        }
+        Err(error) => {
+            logging!(warn, Type::Setup, "启动自动更新订阅后刷新内核配置失败: {}", error);
+        }
+    }
+
+    let success = remote_uids.len().saturating_sub(failed);
+    logging!(
+        info,
+        Type::Setup,
+        "启动自动更新订阅完成：成功 {}，失败 {}",
+        success,
+        failed
+    );
+
+    success > 0
 }
 
 pub(super) async fn init_hotkey() {

@@ -1,4 +1,8 @@
-use crate::{config::Config, feat, singleton, utils::resolve::is_resolve_done};
+use crate::{
+    config::{Config, PrfItem},
+    feat, singleton,
+    utils::resolve::is_resolve_done,
+};
 use anyhow::{Context as _, Result};
 use clash_verge_logging::{Type, logging, logging_error};
 use delay_timer::prelude::{DelayTimer, DelayTimerBuilder, TaskBuilder};
@@ -16,6 +20,7 @@ use std::{
 use tokio::time::{sleep, timeout};
 
 type TaskID = u64;
+const DEFAULT_REMOTE_UPDATE_INTERVAL_MINUTES: u64 = 60;
 
 #[derive(Debug, Clone)]
 pub struct TimerTask {
@@ -43,6 +48,15 @@ pub struct Timer {
 singleton!(Timer, TIMER_INSTANCE);
 
 impl Timer {
+    fn resolve_remote_profile_interval(item: &PrfItem) -> Option<u64> {
+        if item.itype.as_deref() != Some("remote") {
+            return None;
+        }
+
+        // 产品定制：所有远程订阅固定每小时更新一次，不受单订阅开关和间隔配置影响
+        Some(DEFAULT_REMOTE_UPDATE_INTERVAL_MINUTES)
+    }
+
     fn new() -> Self {
         Self {
             delay_timer: Arc::new(RwLock::new(DelayTimerBuilder::default().build())),
@@ -96,16 +110,11 @@ impl Timer {
             items
                 .iter()
                 .filter_map(|item| {
-                    let allow_auto_update = item.option.as_ref()?.allow_auto_update.unwrap_or_default();
-                    if !allow_auto_update {
-                        return None;
-                    }
-
-                    let interval = item.option.as_ref()?.update_interval? as i64;
-                    let updated = item.updated? as i64;
+                    let interval = Self::resolve_remote_profile_interval(item)? as i64;
+                    let updated = item.updated.unwrap_or_default() as i64;
                     let uid = item.uid.as_ref()?;
 
-                    if interval > 0 && cur_timestamp - updated >= interval * 60 {
+                    if cur_timestamp - updated >= interval * 60 {
                         logging!(info, Type::Timer, "需要立即更新的配置: uid={}", uid);
                         Some(uid.clone())
                     } else {
@@ -237,11 +246,8 @@ impl Timer {
 
         if let Some(items) = Config::profiles().await.latest_arc().get_items() {
             for item in items.iter() {
-                if let Some(option) = item.option.as_ref()
-                    && let Some(allow_auto_update) = option.allow_auto_update
-                    && let (Some(interval), Some(uid)) = (option.update_interval, &item.uid)
-                    && allow_auto_update
-                    && interval > 0
+                if let Some(uid) = item.uid.as_ref()
+                    && let Some(interval) = Self::resolve_remote_profile_interval(item)
                 {
                     logging!(
                         debug,
@@ -430,7 +436,7 @@ impl Timer {
             let is_current = Config::profiles().await.latest_arc().current.as_ref() == Some(uid);
             logging!(info, Type::Timer, "配置 {} 是否为当前激活配置: {}", uid, is_current);
 
-            feat::update_profile(uid, None, is_current, false, false).await
+            feat::update_profile(uid, None, is_current, true, false).await
         })
         .await
         {
