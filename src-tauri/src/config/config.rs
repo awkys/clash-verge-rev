@@ -134,11 +134,7 @@ impl Config {
         });
         verge.apply();
 
-        logging!(
-            info,
-            Type::Config,
-            "首次启动迁移：默认开启系统代理并写入初始化标记"
-        );
+        logging!(info, Type::Config, "首次启动迁移：默认开启系统代理并写入初始化标记");
         logging_error!(Type::Config, verge.data_arc().save_file().await);
         Ok(())
     }
