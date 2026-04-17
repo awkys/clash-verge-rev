@@ -12,10 +12,14 @@ echo "（输入密码时屏幕不会显示任何字符或星号，请直接盲�
 echo ""
 
 sudo xattr -r -d com.apple.quarantine "/Applications/Clash Verge.app"
+sudo chmod -R 755 "/Applications/Clash Verge.app"
+sudo codesign --force --deep --sign - "/Applications/Clash Verge.app" >/dev/null 2>&1
 
 if [ $? -eq 0 ]; then
     echo ""
     echo "✅ 恭喜！拦截已成功解除。"
+    echo "⏳ 正在自动启动 Clash Verge..."
+    open -a "/Applications/Clash Verge.app"
     echo "现在您可以前往【应用程序】双击正常打开 Clash Verge 了！"
     echo ""
 else

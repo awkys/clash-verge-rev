@@ -30,6 +30,8 @@ echo "👉 （重要提示：输入密码时，屏幕上什么都不会显示，
 echo ""
 
 sudo xattr -r -d com.apple.quarantine "/Applications/Clash Verge.app"
+sudo chmod -R 755 "/Applications/Clash Verge.app"
+sudo codesign --force --deep --sign - "/Applications/Clash Verge.app" >/dev/null 2>&1
 
 if [ $? -eq 0 ]; then
     echo ""

@@ -1,0 +1,10 @@
+首次拦截处理（30秒）
+
+1. 先把 Clash Verge.app 拖到 Applications（应用程序）。
+2. 按 Command + 空格，输入“终端”，回车打开。
+3. 粘贴并回车执行：
+sudo xattr -dr com.apple.quarantine "/Applications/Clash Verge.app"
+4. 输入开机密码后回车（输入时不显示字符，正常）。
+5. 回到应用程序双击 Clash Verge 打开。
+
+还被拦截：到“系统设置 -> 隐私与安全性”点“仍要打开”。

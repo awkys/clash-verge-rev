@@ -79,8 +79,17 @@ jobs:
           7z a -p123456 ClashVerge-Windows_Installer.zip *setup.exe
         shell: bash
 
+      - name: Generate SHA256
+        shell: pwsh
+        run: |
+          $dir = "target/${{ matrix.target }}/release/bundle/nsis"
+          Get-ChildItem -Path $dir -Filter "*.zip" | ForEach-Object {
+            $hash = (Get-FileHash -Path $_.FullName -Algorithm SHA256).Hash.ToLower()
+            Set-Content -Path "$($_.FullName).sha256" -Value "$hash  $($_.Name)" -Encoding ascii
+          }
+
       - name: Upload Windows Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: windows-${{ matrix.target }}-installer
-          path: target/${{ matrix.target }}/release/bundle/nsis/ClashVerge-Windows_Installer.zip
+          path: target/${{ matrix.target }}/release/bundle/nsis/ClashVerge-Windows_Installer.zip*
